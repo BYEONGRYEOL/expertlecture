@@ -1,65 +1,80 @@
 package com.sparta.springauth.config;
 
+import com.sparta.springauth.jwt.JwtAuthorizationFilter;
+import com.sparta.springauth.jwt.JwtAuthenticationFilter;
+import com.sparta.springauth.jwt.JwtUtil;
+import com.sparta.springauth.security.UserDetailsServiceImpl;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.security.servlet.PathRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity // Spring Security 지원을 가능하게 함
+@RequiredArgsConstructor
 public class WebSecurityConfig {
+
+    private final JwtUtil jwtUtil;
+    private final UserDetailsServiceImpl userDetailsService;
+    private final AuthenticationConfiguration authenticationConfiguration;
+
+
+    // AuthenticationManager는 그냥 Bean으로 Autowire가 안되어서 Manager를 통해 생성 후 수동 Bean 등록한다.
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+        return configuration.getAuthenticationManager();
+    }
+
+    @Bean
+    public JwtAuthenticationFilter jwtAuthenticationFilter() throws Exception {
+        // 의존성 주입
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtUtil);
+        filter.setAuthenticationManager(authenticationManager(authenticationConfiguration));
+        return filter;
+    }
+
+    @Bean
+    public JwtAuthorizationFilter jwtAuthorizationFilter() {
+        return new JwtAuthorizationFilter(jwtUtil, userDetailsService);
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         // CSRF 설정
-        // RESTFul 한 api를 제공하니까 diable해도 좋다.
         http.csrf((csrf) -> csrf.disable());
+
+        // 기본 설정인 Session 방식은 사용하지 않고 JWT 방식을 사용하기 위한 설정
+        http.sessionManagement((sessionManagement) ->
+                sessionManagement.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+        );
 
         http.authorizeHttpRequests((authorizeHttpRequests) ->
                 authorizeHttpRequests
-                        // css or js or 회원가입, 로그인 관련 api 접근시 resources 접근 허용 설정
-                        .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
-                        .requestMatchers("/api/user/**").permitAll() // /api/user/ 로시작하는 요청 허가
+                        .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll() // resources 접근 허용 설정
+                        .requestMatchers("/api/user/**").permitAll() // '/api/user/'로 시작하는 요청 모두 접근 허가
                         .anyRequest().authenticated() // 그 외 모든 요청 인증처리
         );
 
-        // 로그인 사용
-        // 스프링 시큐리티 내부적으로 loginpage
-        http.formLogin((formLogin)->
+        http.formLogin((formLogin) ->
                 formLogin
-                        //각각 필터체인을 걸어두는건데,
-                        //인증이 필요한 사용자의 Get 요청시 아래 나의 로그인페이지로
-                        .loginPage("/api/user/login-page") // http GET 요청이 와서 loginPage로 이동시킴
-                        .loginProcessingUrl("/api/user/login") // POST login post 요청 url 지정
-                        // 주의 위의 url이 내 api와 같다고해서 내 로그인 api에 해당하는 함수가 실행되는 것이 아님
-
-                        .defaultSuccessUrl("/")
-                        .failureUrl("/api/user/login-page?error")
-                        .permitAll()
+                        .loginPage("/api/user/login-page").permitAll()
         );
+
+
+
+        // 필터 관리
+        // 뒤에 필터 앞에 내 필터를 넣겠다.
+        http.addFilterBefore(jwtAuthorizationFilter(), JwtAuthenticationFilter.class);
+        http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
