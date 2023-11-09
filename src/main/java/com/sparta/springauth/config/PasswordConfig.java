@@ -1,0 +1,14 @@
+package com.sparta.springauth.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+@Configuration // @Bean 함수가 있으므로 서버가 켜질 때 아래 함수가 Bean으로 등록될것
+public class PasswordConfig {
+    @Bean // bean 수동 등록
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}
