@@ -1,6 +1,6 @@
 package com.sparta.springauth.service;
 
-import com.sparta.springauth.dto.LoginRequest;
+import com.sparta.springauth.dto.LoginRequestDto;
 import com.sparta.springauth.dto.SignupRequest;
 import com.sparta.springauth.entity.User;
 import com.sparta.springauth.entity.UserRoleEnum;
@@ -57,22 +57,5 @@ public class UserService {
         userRepository.save(user);
     }
 
-    public void login(LoginRequest req, HttpServletResponse res) {
-        String username = req.getUsername();
-        String password = req.getPassword();
 
-        // 사용자 존재 확인
-        User user = userRepository.findByUsername(username).orElseThrow(() -> new IllegalArgumentException("등록된 사용자가 없습니다."));
-
-        //비밀번호 확인
-        // passwordEncoder 평문, 암호문
-        if(!passwordEncoder.matches(password, user.getPassword())){
-            throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
-        }
-
-        // jwt 생성 및 발급
-        String token = jwtUtil.createToken(user.getUsername(), user.getRole());
-        jwtUtil.addJwtToCookie(token, res);
-
-    }
 }
